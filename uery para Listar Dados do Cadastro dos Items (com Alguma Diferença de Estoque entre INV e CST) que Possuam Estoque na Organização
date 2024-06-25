@@ -1,0 +1,166 @@
+-- Query para Listar Dados do Cadastro dos Items (com Alguma Diferença de Estoque entre INV e CST) que Possuam Estoque na Organização
+
+ --uma querry 
+
+SELECT tmp.*
+  FROM  (  
+
+ 
+
+            -- Lista de Itens com Alguma Diferença de Estoque entre INV e CST, no nível de Unidade de Valoração ( CO + IO + SUBINV )
+
+ 
+
+            SELECT iop.ORGANIZATION_CODE
+                 , esiv.ITEM_NUMBER
+                 , esiv.DESCRIPTION item_description
+                 , esiv.PRIMARY_UOM_CODE
+                 , esiv.INVENTORY_ITEM_ID
+                 , esiv.ORGANIZATION_ID
+                 , tmp.COST_ORG_NAME
+                 , iop.BASE_COST_ORG_NAME
+              FROM fusion.EGP_SYSTEM_ITEMS_VL esiv
+                 , ( SELECT iop.ORGANIZATION_CODE
+                          , iop.ORGANIZATION_ID
+                          , ccov.COST_ORG_NAME BASE_COST_ORG_NAME
+                          , ccov.COST_ORG_CODE BASE_COST_ORG_CODE
+                          , cciv.COST_ORG_ID BASE_COST_ORG_ID
+                          , ccbv.COST_BOOK_CODE BASE_COST_BOOK_CODE
+                          , ccbv.PERIODIC_AVERAGE_FLAG
+                         FROM fusion.INV_ORG_PARAMETERS iop
+                            , fusion.CST_COST_INV_ORGS cciv
+                            , fusion.CST_COST_ORGS_V ccov
+                            , fusion.CST_COST_ORG_BOOKS ccob
+                            , fusion.CST_COST_BOOKS_VL ccbv
+                         WHERE 1 = 1
+                           AND ccov.COST_ORG_ID  = cciv.COST_ORG_ID
+                           AND cciv.INV_ORG_ID = iop.ORGANIZATION_ID
+                           AND ccob.COST_ORG_ID = ccov.COST_ORG_ID
+                           AND ccob.PRIMARY_BOOK_FLAG = 'Y'
+                           AND ccbv.COST_BOOK_ID = ccob.COST_BOOK_ID
+                           AND ccov.COST_ORG_NAME NOT IN ('CO EBSE BU')
+                   ) iop    
+                 , (
+
+ 
+
+            ------------------------------------- INICIO : COLAR QUERY LISTA DE ITENS DO EXCEL AQUI --------------------------------
+
+ 
+
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, '1120444' ITEM_NUMBER, 18400.02 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, 'INATIVO-1124353' ITEM_NUMBER, 10.28 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, 'INATIVO-1129662' ITEM_NUMBER, 8.14 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, 'INATIVO-1129663' ITEM_NUMBER, 4.60 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, 'INATIVO-1129677' ITEM_NUMBER, 3.60 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, 'INATIVO-1129686' ITEM_NUMBER, 2.52 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, 'INATIVO-1129695' ITEM_NUMBER, 2.42 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, 'INATIVO-1129698' ITEM_NUMBER, 6.17 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, 'INATIVO-1129713' ITEM_NUMBER, 5.54 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, 'INATIVO-1129719' ITEM_NUMBER, 3.78 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, 'INATIVO-1129735' ITEM_NUMBER, 7.40 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO CONS ENGIE INEO JOHNSON' COST_ORG_NAME, 'INATIVO-1130941' ITEM_NUMBER, 122.37 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1108118' ITEM_NUMBER, 18973.70 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1108147' ITEM_NUMBER, 4622.05 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1112717' ITEM_NUMBER, 10125.73 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1116541' ITEM_NUMBER, 5425.53 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1116588' ITEM_NUMBER, 647.00 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1117522' ITEM_NUMBER, 8062.17 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1117535' ITEM_NUMBER, 7731.57 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1117601' ITEM_NUMBER, 2252.75 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1117630' ITEM_NUMBER, 4547.26 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1117689' ITEM_NUMBER, 23161.59 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1117794' ITEM_NUMBER, 282.26 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1120274' ITEM_NUMBER, 408.17 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1121131' ITEM_NUMBER, 12243.63 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1121212' ITEM_NUMBER, 0.00 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1122425' ITEM_NUMBER, 1207.01 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1122646' ITEM_NUMBER, 3746.80 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1123213' ITEM_NUMBER, 6994.47 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EBSI SOLUCOES BU' COST_ORG_NAME, '1123398' ITEM_NUMBER, 678.64 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EGE-ACS BU' COST_ORG_NAME, '1133170' ITEM_NUMBER, 0.00 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO EGE-ACS BU' COST_ORG_NAME, '1133213' ITEM_NUMBER, 2.57 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO ENGIE SPE UBE BU' COST_ORG_NAME, '1087042' ITEM_NUMBER, 803.71 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO ENGIE SPE UBE BU' COST_ORG_NAME, '1123103' ITEM_NUMBER, 103.48 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO ENGIE SPE UBE BU' COST_ORG_NAME, '1133120' ITEM_NUMBER, 201.58 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO ENGIE SPE UBE BU' COST_ORG_NAME, '1134317' ITEM_NUMBER, 0.01 REF_UNIT_COST FROM DUAL UNION
+            SELECT 'CO ENGIE SPE UBE BU' COST_ORG_NAME, 'INATIVO-1134283' ITEM_NUMBER, 16529.06 REF_UNIT_COST FROM DUAL
+
+ 
+
+
+            ------------------------------------- FIM : COLAR QUERY LISTA DE ITENS DO EXCEL AQUI -----------------------------------
+
+ 
+
+                   ) tmp
+              WHERE 1 = 1
+                AND iop.ORGANIZATION_ID = esiv.ORGANIZATION_ID
+                AND esiv.INVENTORY_ITEM_FLAG = 'Y'
+                AND esiv.STOCK_ENABLED_FLAG = 'Y'
+                AND esiv.MTL_TRANSACTIONS_ENABLED_FLAG = 'Y'
+                AND esiv.item_number = tmp.ITEM_NUMBER
+              ORDER BY tmp.COST_ORG_NAME, esiv.ITEM_NUMBER, iop.ORGANIZATION_CODE
+
+ 
+
+        ) tmp
+  WHERE 1 = 1
+    AND EXISTS
+        ( SELECT 'item tem Estoque na Organização'
+            FROM fusion.INV_ONHAND_QUANTITIES_DETAIL ioqd 
+            WHERE 1 = 1
+              AND ioqd.INVENTORY_ITEM_ID = tmp.INVENTORY_ITEM_ID
+              AND ioqd.ORGANIZATION_ID = tmp.ORGANIZATION_ID
+              AND ROWNUM = 1
+        )
+
+
+--Esta query base, lista os itens que tem est... by Alexandre Garcia
+
+
+--LET'S START!
+
+SELECT 
+		dha.order_number,
+		dheb.eff_line_id,
+		dheb.context_code,
+		dheb.attribute_charl
+		FROM fusion.INV_ONHAND_QUANTITIES_DETAIL ioqd 
+		msi.segment1               item, 
+		pla.CATEGORY_ID            CATALOG,
+		pda.distribution_num,   
+		pll.description            descricao,                 
+		pll.quantity               QTY_ORD,                    
+		pll.quantity_received      QTY_REC,                    
+		pll.quantity_cancelled     QTY_CANCELLED,  
+		pll.quantity_billed        QTY_FATURADA,                  
+		pla.unit_price             VALOR_UNITARIO,                    
+		pla.market_price           MARKET_PRICE,  
+		prla.creation_date         REQ_CREATION_DATE,  
+		prha.approved_date         REQ_APPROVED_DATE,  
+		pla.creation_date          PO_CREATION_DATE,  
+		pha.approved_date          PO_APPROVED_DATE,  
+		pha.submit_date            PO_SUBMIT_DATE,  
+		nvl(pha.closed_code,'OPEN')            CLOSED_CODE,  
+		pv.vendor_type_lookup_code   VENDOR_TYPE,  
+		
+		
+		-----------
+		
+SELECT FROM iop.CTO_MATCH_HEADERS
+		
+		
+		FROM fusion.CTO_MATCH_LINES
+			cto.LINE_ID,
+			cto.HEADER_ID
+			cto.SUB_ITEM_TYPE
+			cto.INVENTORY_ITEM_ID
+			cto.UNIT_QTY
+			cto.UNIT_UOM
+			cto.CREATED_BY
+			cto.LAST_UPDATED_BY
+			cto.LAST_UPDATE_DATE
+			
+			
+		
