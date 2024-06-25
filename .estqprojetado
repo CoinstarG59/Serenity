@@ -1,0 +1,353 @@
+--    
+	SELECT EstqProjetado.*
+	  FROM
+	(
+
+		---------------------------------------------------------------------------------------------------------------
+		-- Análise Posiçao de Estoque INV x CST, considerando as eventuais diferenças de quantidade de estoque.
+		--  (A) Quando houver diferença, será considerado o custo médio projetado calculado considerando as POs não processadas
+		--  (B) Quando não houver diferença e houver estoque, será considerado o custo médio calculado pelo sistema
+		--  (C) Quando não houver diferença e não houver estoque, será considerado o custo médio projetado calculado considerando as POs não processadas
+		---------------------------------------------------------------------------------------------------------------
+
+		SELECT *
+		  FROM
+		  (
+
+		  -- Lista Posição de Estoque Detalhada dos Itens por Unidade de Valoração (Organização de Custo + Organização de Inventário + Subinventário)
+
+			SELECT item.*
+				 , custo.PERIOD_NAME
+				 , custo.COST_ORG_NAME
+				 , custo.COST_BOOK_CODE
+				 , custo.VAL_UNIT_CODE
+				 , estoque.QUANTITY_ONHAND INV_QUANTITY_ONHAND
+				 , NVL(custo.QUANTITY_ONHAND,0) CST_QUANTITY_ONHAND
+				 , custo.COST_METHOD_CODE
+				 , NVL( DECODE( custo.COST_METHOD_CODE
+						      , 'PERPETUAL_AVERAGE',custo.PERP_AVERAGE_COST
+						      , 'PERIODIC_AVERAGE',custo.PERIODIC_AVG_COST
+						      , 'STANDARD',custo.STANDARD_COST
+						      , 'FIFO',custo.UNIT_COST
+					          )
+					  , 0
+					  ) BASE_UNIT_COST
+				 , custo.UNIT_COST VU_UNIT_COST		 
+				 , NVL(custo.AMOUNT,0) AMOUNT
+				 , custo.CURRENCY_CODE
+				 , NVL(pend_transact.BASE_TOTAL_QUANTITY,0) BASE_PO_TOTAL_TRANSACTION_QTY
+				 , ROUND( NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0), 2 ) BASE_PO_TOTAL_TRANSACTION_AMOUNT
+				 , ( NVL(custo.AMOUNT,0) + NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) ) VALOR_ESTQ_PROJETADO_C_PO
+				 , CASE 
+					 WHEN NVL(custo.QUANTITY_ONHAND,0) <> NVL(estoque.QUANTITY_ONHAND,0) THEN 
+					   ( NVL(custo.QUANTITY_ONHAND,0) + NVL(pend_transact.BASE_TOTAL_QUANTITY,0) ) 
+					 ELSE 
+					   CASE
+						 WHEN NVL(estoque.QUANTITY_ONHAND,0) = 0 AND NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) > 0 THEN
+						   ( NVL(custo.QUANTITY_ONHAND,0) +  NVL(pend_transact.BASE_TOTAL_QUANTITY,0) )
+						 ELSE
+						   NVL(custo.QUANTITY_ONHAND,0)
+					   END  
+				   END QTD_ESTQ_PROJETADO_C_PO
+				 , CASE 
+					 WHEN NVL(custo.QUANTITY_ONHAND,0) <> NVL(estoque.QUANTITY_ONHAND,0) AND NVL(pend_transact.BASE_TOTAL_QUANTITY,0) > 0 THEN 
+					   ( ( NVL(custo.AMOUNT,0) + NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) ) / ( NVL(custo.QUANTITY_ONHAND,0) + NVL(pend_transact.BASE_TOTAL_QUANTITY,0) ) )
+					 ELSE 
+					   CASE
+						 WHEN NVL(estoque.QUANTITY_ONHAND,0) = 0 AND NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) > 0 THEN
+						   ( ( NVL(custo.AMOUNT,0) + NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) ) / ( NVL(custo.QUANTITY_ONHAND,0) + NVL(pend_transact.BASE_TOTAL_QUANTITY,0) ) )
+						 ELSE
+						   NVL(custo.UNIT_COST,0)
+					   END  
+				   END CUSTO_MEDIO_PROJETADO_FINAL
+				 , CASE 
+					 WHEN NVL(custo.QUANTITY_ONHAND,0) <> NVL(estoque.QUANTITY_ONHAND,0) AND NVL(pend_transact.BASE_TOTAL_QUANTITY,0) > 0 THEN 
+					   ROUND( ( NVL(custo.AMOUNT,0) + NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) ) / ( NVL(custo.QUANTITY_ONHAND,0) +  NVL(pend_transact.BASE_TOTAL_QUANTITY,0) ), 6)
+					 ELSE 
+					   CASE
+						 WHEN NVL(estoque.QUANTITY_ONHAND,0) = 0 AND NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) > 0 THEN
+						   ROUND( ( NVL(custo.AMOUNT,0) + NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) ) / ( NVL(custo.QUANTITY_ONHAND,0) +  NVL(pend_transact.BASE_TOTAL_QUANTITY,0) ), 6)
+						 ELSE
+						   ROUND( NVL(custo.UNIT_COST,0), 6 )
+					   END  
+				   END CUSTO_MEDIO_PROJETADO_FINAL_X
+				 , CASE 
+					 WHEN NVL(custo.QUANTITY_ONHAND,0) <> NVL(estoque.QUANTITY_ONHAND,0) AND NVL(pend_transact.BASE_TOTAL_QUANTITY,0) > 0 THEN 
+					   ( estoque.QUANTITY_ONHAND * ( ( NVL(custo.AMOUNT,0) + NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) ) / ( NVL(custo.QUANTITY_ONHAND,0) +  NVL(pend_transact.BASE_TOTAL_QUANTITY,0) ) ) )
+					 ELSE 
+					   CASE
+						 WHEN NVL(estoque.QUANTITY_ONHAND,0) = 0 AND NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) > 0 THEN
+						   ( estoque.QUANTITY_ONHAND * ( ( NVL(custo.AMOUNT,0) + NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) ) / ( NVL(custo.QUANTITY_ONHAND,0) +  NVL(pend_transact.BASE_TOTAL_QUANTITY,0) ) ) )
+						 ELSE
+						   NVL(custo.AMOUNT,0)
+					   END  
+				   END VALOR_ESTQ_PROJETADO_FINAL
+				 , CASE 
+					 WHEN NVL(custo.QUANTITY_ONHAND,0) <> NVL(estoque.QUANTITY_ONHAND,0) AND NVL(pend_transact.BASE_TOTAL_QUANTITY,0) > 0 THEN 
+					   ROUND( ( estoque.QUANTITY_ONHAND * ( ( NVL(custo.AMOUNT,0) + NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) ) / ( NVL(custo.QUANTITY_ONHAND,0) +  NVL(pend_transact.BASE_TOTAL_QUANTITY,0) ) ) ), 2 )
+					 ELSE 
+					   CASE
+						 WHEN NVL(estoque.QUANTITY_ONHAND,0) = 0 AND NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) > 0 THEN
+						   ROUND( ( estoque.QUANTITY_ONHAND * ( ( NVL(custo.AMOUNT,0) + NVL(pend_transact.BASE_PO_TOTAL_TRANSACTION_AMOUNT,0) ) / ( NVL(custo.QUANTITY_ONHAND,0) +  NVL(pend_transact.BASE_TOTAL_QUANTITY,0) ) ) ), 2 )
+						 ELSE
+						   ROUND( NVL(custo.AMOUNT,0), 2 )
+					   END  
+				   END VALOR_ESTQ_PROJETADO_FINAL_X
+				 , CASE 
+					 WHEN NVL(custo.QUANTITY_ONHAND,0) <> NVL(estoque.QUANTITY_ONHAND,0) THEN 'Y'
+					 ELSE 'N'
+				   END ALGUMA_DIFERENCA_INV_X_CST
+
+			  FROM (
+
+					-- Lista Informações Detalhadas de um Item/Organização + Subinventários Provaveis de Estoque
+
+					  SELECT iop.ORGANIZATION_CODE
+						   , iop.BASE_COST_ORG_NAME
+						   , iop.BASE_COST_ORG_CODE
+						   , iop.BASE_COST_ORG_ID
+						   , iop.BASE_COST_BOOK_CODE
+						   , iop.BASE_COST_BOOK_ID 
+						   , iop.BASE_VAL_UNIT_CODE
+						   , iop.BASE_VAL_UNIT_ID
+						   , iop.BASE_PERIOD_NAME
+						   , ( SELECT cps.START_DATE
+								 FROM fusion.CST_PERIOD_STATUSES cps
+								 WHERE 1 = 1
+								   AND cps.COST_ORG_ID = iop.BASE_COST_ORG_ID
+								   AND cps.COST_BOOK_ID = iop.BASE_COST_BOOK_ID
+								   AND cps.PERIOD_NAME = iop.BASE_PERIOD_NAME
+							 ) BASE_PERIOD_START_DATE
+						   , iop.SUBINVENTORY_CODE
+						   , esiv.ITEM_NUMBER
+						   , esiv.DESCRIPTION item_description
+						   , esiv.PRIMARY_UOM_CODE
+						   , iuomv.UNIT_OF_MEASURE PRIMARY_UNIT_OF_MEASURE
+						   , esiv.INVENTORY_ITEM_ID
+						   , esiv.ORGANIZATION_ID
+						FROM ( SELECT iop.ORGANIZATION_CODE
+									, iop.ORGANIZATION_ID
+									, ccov.COST_ORG_NAME BASE_COST_ORG_NAME
+									, ccov.COST_ORG_CODE BASE_COST_ORG_CODE
+									, cciv.COST_ORG_ID BASE_COST_ORG_ID
+									, ccbv.COST_BOOK_CODE BASE_COST_BOOK_CODE
+									, ccbv.PERIODIC_AVERAGE_FLAG
+									, isi.SECONDARY_INVENTORY_NAME SUBINVENTORY_CODE
+									, cvuv.VAL_UNIT_CODE BASE_VAL_UNIT_CODE
+									, cvuc.VAL_UNIT_COMBINATION_ID
+									, cvud.VAL_UNIT_ID BASE_VAL_UNIT_ID
+									, cvud.COST_BOOK_ID BASE_COST_BOOK_ID 
+									, cvud.VAL_STRUCTURE_ID
+									, ( SELECT caos.PERIOD_NAME
+										  FROM ( SELECT caos.PERIOD_NAME
+													  , caos.PERIOD_START_DATE
+												   FROM fusion.CST_ATTR_ONHAND_SUMMARY caos
+												   WHERE 1 = 1
+													 AND caos.COST_BOOK_ID = cvud.COST_BOOK_ID
+													 AND caos.COST_ORG_ID = cciv.COST_ORG_ID
+													 AND caos.INVENTORY_ORG_ID = iop.ORGANIZATION_ID
+													 AND caos.SUBINVENTORY_CODE = isi.SECONDARY_INVENTORY_NAME
+													 AND caos.VAL_UNIT_ID = cvud.VAL_UNIT_ID
+												   ORDER BY caos.PERIOD_START_DATE  DESC
+											   ) caos
+										  WHERE ROWNUM = 1
+									  ) BASE_PERIOD_NAME 
+								 FROM fusion.INV_ORG_PARAMETERS iop
+									, fusion.CST_COST_INV_ORGS cciv
+									, fusion.CST_COST_ORGS_V ccov
+									, fusion.CST_COST_ORG_BOOKS ccob
+									, fusion.CST_COST_BOOKS_VL ccbv
+									, fusion.INV_SECONDARY_INVENTORIES isi
+									, fusion.CST_VAL_UNIT_COMBINATIONS cvuc
+									, fusion.CST_VAL_UNIT_DETAILS cvud
+									, fusion.CST_VAL_UNITS_VL cvuv
+								 WHERE 1 = 1
+								   AND ccov.COST_ORG_ID  = cciv.COST_ORG_ID
+								   AND cciv.INV_ORG_ID = iop.ORGANIZATION_ID
+								   AND ccob.COST_ORG_ID = ccov.COST_ORG_ID
+								   AND ccob.PRIMARY_BOOK_FLAG = 'Y'
+								   AND ccbv.COST_BOOK_ID = ccob.COST_BOOK_ID
+								   AND isi.ORGANIZATION_ID = iop.ORGANIZATION_ID
+								   AND cvuc.COST_ORG_CODE = ccov.COST_ORG_CODE
+								   AND cvuc.INV_ORG_CODE = iop.ORGANIZATION_CODE
+								   AND cvuc.SUBINVENTORY_CODE = isi.SECONDARY_INVENTORY_NAME
+								   AND cvud.VAL_UNIT_COMBINATION_ID = cvuc.VAL_UNIT_COMBINATION_ID
+								   AND cvud.COST_BOOK_ID = ccob.COST_BOOK_ID
+								   AND cvuv.VAL_UNIT_ID = cvud.VAL_UNIT_ID
+
+							 ) iop	 
+						   , fusion.EGP_SYSTEM_ITEMS_VL esiv
+						   , fusion.INV_UNITS_OF_MEASURE_VL iuomv
+						WHERE 1 = 1
+						  AND iuomv.UOM_CODE = esiv.PRIMARY_UOM_CODE
+						  AND esiv.ORGANIZATION_ID = iop.ORGANIZATION_ID
+						  AND esiv.COSTING_ENABLED_FLAG = 'Y'
+						  AND esiv.INVENTORY_ASSET_FLAG = 'Y'
+						  AND esiv.INVENTORY_ITEM_FLAG = 'Y'
+						  AND esiv.STOCK_ENABLED_FLAG = 'Y'
+						  AND esiv.MTL_TRANSACTIONS_ENABLED_FLAG = 'Y'
+
+				   ) item
+				 , ( 
+
+					-- Lista Informações Detalhadas de Custo de Item/Unidade de Valoração
+
+					SELECT caov.* 
+						 , cvuv.VAL_UNIT_CODE
+						 , ccov.COST_ORG_NAME
+						 , ccov.COST_ORG_CODE
+						 , ccov.EFFECTIVE_START_DATE CO_EFFECTIVE_START_DATE
+						 , ccov.EFFECTIVE_END_DATE CO_EFFECTIVE_END_DATE
+						 , ccov.STATUS CO_STATUS
+						 , ccov.LEGAL_ENTITY_ID
+						 , ccbv.COST_BOOK_CODE
+						 , ccbv.PERIODIC_AVERAGE_FLAG
+						 , ccbv.COST_BOOK_DESC
+					  FROM fusion.CST_VU_ONHAND_VALUATIONS caov ---CST_ATTR_ONHAND_VALUATIONS caov
+						 , fusion.CST_VAL_UNITS_VL cvuv
+						 , fusion.CST_COST_ORGS_V ccov
+						 , fusion.CST_COST_BOOKS_VL ccbv
+					  WHERE 1 = 1
+						AND cvuv.VAL_UNIT_ID = caov.VAL_UNIT_ID
+						AND ccov.COST_ORG_ID 
+ 						= caov.COST_ORG_ID 
+						AND ccbv.COST_BOOK_ID = caov.COST_BOOK_ID
+
+				   ) custo		
+				 , (
+					-- Lista Transações de Custo Relativas a POs Não Processadas (TRANSAÇÃO DO NÃO INV CUSTEADA OU EXCLUIDA DO CUSTO)
+
+					SELECT tmp.VAL_UNIT_ID
+						 , tmp.INVENTORY_ITEM_ID
+						 , SUM(tmp.BASE_PO_TRANSACTION_AMOUNT) BASE_PO_TOTAL_TRANSACTION_AMOUNT
+						 , SUM(tmp.base_quantity) BASE_TOTAL_QUANTITY
+					  FROM 
+							(
+								SELECT ccov.COST_ORG_NAME
+									 , ccov.COST_ORG_CODE
+									 , ccbv.COST_BOOK_CODE
+									 , iop.ORGANIZATION_CODE
+									 , cvsv.VAL_STRUCTURE_CODE
+									 , cvsv.VAL_STRUCTURE_DESC
+									 , esiv.ITEM_NUMBER
+									 , esiv.DESCRIPTION item_description
+									 , esiv.PRIMARY_UOM_CODE
+									 , tmp.*z
+									 , ( tmp.base_quantity * tmp.base_unit_cost ) base_transaction_amount
+									 , ( tmp.BASE_PO_UNIT_PRICE * tmp.TRANSACTION_QTY ) BASE_PO_TRANSACTION_amount
+									 , ( SELECT ittv.TRANSACTION_TYPE_NAME
+										   FROM fusion.INV_TRANSACTION_TYPES_VL ittv
+										   WHERE ittv.TRANSACTION_TYPE_ID = tmp.BASE_TXN_TYPE_ID
+									   ) BASE_TXN_TYPE_NAME
+									 , NVL( ( SELECT 'CUSTEADA E DISTRIBUIDA'
+											   FROM fusion.CST_COST_DISTRIBUTIONS ccd
+											   WHERE ccd.TRANSACTION_ID = tmp.TRANSACTION_ID
+											)
+										  , 'NÃO CUSTEADA'
+										  ) STATUS_TRANSACAO_CUSTO
+								  FROM
+										(  
+											SELECT ct.*
+												 , ct.QUANTITY base_quantity
+												 , nvl( ( SELECT sum(ctc.UNIT_COST)
+															from CST_TRANSACTION_COSTS ctc	
+															WHERE ctc.TRANSACTION_ID = ct.TRANSACTION_ID
+															  AND ctc.expense_pool_id <> -5
+															  AND ct.MATCHED_TO_COST_FLAG = 'Y'
+														)
+													  , 0
+													  ) base_unit_cost
+												 , ( SELECT pda.AMOUNT_BILLED 
+													   FROM fusion.PO_HEADERS_ALL pha
+														  , fusion.PO_LINES_ALL pla
+														  , fusion.PO_DISTRIBUTIONS_ALL pda
+													   WHERE 1 = 1
+														 AND pha.PO_HEADER_ID = pla.PO_HEADER_ID
+														 AND pla.PO_LINE_ID = pda.PO_LINE_ID
+														 AND pda.PO_DISTRIBUTION_ID = ct.PO_DISTRIBUTION_ID
+												   ) BASE_PO_INVOICED_VALUE
+												 , ( SELECT pla.UNIT_PRICE 
+													   FROM fusion.PO_HEADERS_ALL pha
+														  , fusion.PO_LINES_ALL pla
+														  , fusion.PO_DISTRIBUTIONS_ALL pda
+													   WHERE 1 = 1
+														 AND pha.PO_HEADER_ID = pla.PO_HEADER_ID
+														 AND pla.PO_LINE_ID = pda.PO_LINE_ID
+														 AND pda.PO_DISTRIBUTION_ID = ct.PO_DISTRIBUTION_ID
+												   ) BASE_PO_UNIT_PRICE
+											  FROM fusion.CST_TRANSACTIONS ct
+											  WHERE 1 = 1
+					--							AND ct.COST_TRANSACTION_TYPE = 'RECEIPT'
+					--							AND ct.COST_METHOD_CODE = 'PERPETUAL_AVERAGE'
+					--							AND ct.COST_STATUS IN ('X','N')
+					--
+												AND ct.COST_STATUS = 'N'
+												AND ct.ACCOUNTING_STATUS = 'N'
+												AND ct.TXN_SOURCE_REF_DOC_TYPE = 'PO'
+					--
+										) tmp
+									  , fusion.EGP_SYSTEM_ITEMS_VL esiv 
+									  , fusion.INV_ORG_PARAMETERS iop
+									  , fusion.CST_COST_ORGS_V ccov
+									  , fusion.CST_COST_BOOKS_VL ccbv
+									  , fusion.CST_VAL_STRUCTURES_VL cvsv
+								  WHERE 1 = 1
+									AND esiv.INVENTORY_ITEM_ID = tmp.INVENTORY_ITEM_ID
+								-
+
+.								AND esiv.ORGANIZATION_ID = tmp.INVENTORY_ORG_ID
+									AND iop.ORGANIZATION_ID = tmp.INVENTORY_ORG_ID
+									AND ccov.COST_ORG_ID = tmp.COST_ORG_ID
+									AND ccbv.COST_BOOK_ID = tmp.COST_BOOK_ID
+									AND cvsv.VAL_STRUCTURE_ID = tmp.VAL_STRUCTURE_ID
+								--	
+								--
+							--	
+							) tmp
+					  WHERE 1 = 1
+					  GROUP BY tmp.VAL_UNIT_ID
+							 , tmp.INVENTORY_ITEM_ID
+				   ) pend_transact	 
+				 , (
+
+				  -- Lista Posição de Estoque Detalhada dos Itens por Organização, Subinventário, Locator, Lote e Revisão
+
+					SELECT ioqd.INVENTORY_ITEM_ID
+						 , ioqd.ORGANIZATION_ID
+						 , ioqd.SUBINVENTORY_CODE
+						 , SUM(ioqd.PRIMARY_TRANSACTION_QUANTITY) QUANTITY_ONHAND
+					  FROM fusion.INV_ONHAND_QUANTITIES_DETAIL ioqd 
+					  WHERE 1 = 1
+					  GROUP BY ioqd.INVENTORY_ITEM_ID
+							 , ioqd.ORGANIZATION_ID
+							 , ioqd.SUBINVENTORY_CODE
+
+				   ) estoque		   
+			  WHERE 1 = 1
+				AND custo.VAL_UNIT_ID (+) = item.BASE_VAL_UNIT_ID 
+				AND custo.INVENTORY_ITEM_ID (+) = item.INVENTORY_ITEM_ID
+				AND custo.START_DATE (+) = item.BASE_PERIOD_START_DATE
+				AND custo.PERIOD_NAME (+)  = item.BASE_PERIOD_NAME
+				AND pend_transact.VAL_UNIT_ID (+) = item.BASE_VAL_UNIT_ID 
+				AND pend_transact.INVENTORY_ITEM_ID (+) = item.INVENTORY_ITEM_ID
+				AND estoque.INVENTORY_ITEM_ID (+) = item.INVENTORY_ITEM_ID 
+				AND estoque.ORGANIZATION_ID (+) = item.ORGANIZATION_ID
+				AND estoque.SUBINVENTORY_CODE (+) = item.SUBINVENTORY_CODE
+
+		  ) tmp
+		  WHERE 1 = 1
+--
+			AND tmp.BASE_COST_ORG_NAME NOT IN ('CO TAG BU','CO ESOM BU','CO EBSE BU') -- Descartar Organizações de Custo fora do Escopo do Projeto
+--
+			AND ( :P_COST_ORG_NAME IS NULL OR tmp.BASE_COST_ORG_NAME = :P_COST_ORG_NAME )
+			AND ( :P_ORGANIZATION_CODE IS NULL OR tmp.ORGANIZATION_CODE = :P_ORGANIZATION_CODE )
+			AND ( :P_ITEM_NUMBER IS NULL OR tmp.ITEM_NUMBER = :P_ITEM_NUMBER )	 	
+			AND ( NVL(:P_APENAS_ITENS_C_DIF_ESTQ,'N') = 'N' OR ( :P_APENAS_ITENS_C_DIF_ESTQ = 'Y' AND tmp.ALGUMA_DIFERENCA_INV_X_CST = 'Y' ) )
+
+	) EstqProjetado	  
+
+  WHERE 1 = 1
+  ORDER BY EstqProjetado.BASE_COST_ORG_NAME
+		 , EstqProjetado.ORGANIZATION_CODE
+		 , EstqProjetado.ITEM_NUMBER	
+		 , EstqProjetado.SUBINVENTORY_CODE
